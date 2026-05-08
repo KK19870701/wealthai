@@ -116,3 +116,44 @@ create policy "Users can delete own bills" on bills for delete using (auth.uid()
 --   ('your-user-id', 'Salary - May', 85400, 'income', 'salary', '2026-05-01'),
 --   ('your-user-id', 'Swiggy Order', 680, 'expense', 'food', '2026-05-07'),
 --   ('your-user-id', 'Ola Ride', 215, 'expense', 'transport', '2026-05-06');
+
+-- =============================================
+-- V2 ADDITIONS — Run this in Supabase SQL Editor
+-- if you already ran the original schema
+-- =============================================
+
+-- Add receipt_url column to transactions
+alter table transactions
+  add column if not exists receipt_url text;
+
+-- =============================================
+-- STORAGE BUCKET for receipts
+-- Run in Supabase SQL Editor → Storage
+-- =============================================
+
+-- Create receipts bucket (public)
+insert into storage.buckets (id, name, public)
+values ('receipts', 'receipts', true)
+on conflict (id) do nothing;
+
+-- RLS: users can only access their own folder
+create policy "Users upload own receipts"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'receipts' AND
+    auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+create policy "Users view own receipts"
+  on storage.objects for select
+  using (
+    bucket_id = 'receipts' AND
+    auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+create policy "Users delete own receipts"
+  on storage.objects for delete
+  using (
+    bucket_id = 'receipts' AND
+    auth.uid()::text = (storage.foldername(name))[1]
+  );
